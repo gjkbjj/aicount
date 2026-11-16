@@ -357,7 +357,11 @@ record Bill(String source, String order, long cents, int direction, String merch
     }
 
     boolean shouldPost(boolean includeHistory, Instant now, ZoneId zone) {
-        if (order.isEmpty() || (source.equals(WECHAT) && successPage && direction < 0 && payment.isBlank())) return false;
+        // 支付宝部分版本的账单详情不暴露交易单号，此时用「时间+金额+商家+付款方式」组成的
+        // 指纹去重；只要时间与付款方式都在，页面证据已经完整，可以直接入账。
+        boolean complete = !order.isEmpty()
+                || source.equals(ALIPAY) && !successPage && !tradeTime.isBlank() && !payment.isBlank();
+        if (!complete || (source.equals(WECHAT) && successPage && direction < 0 && payment.isBlank())) return false;
         if (successPage || includeHistory) return true;
         try {
             var format = DateTimeFormatter.ofPattern("uuuu-M-d H:mm[:ss]", java.util.Locale.ROOT)

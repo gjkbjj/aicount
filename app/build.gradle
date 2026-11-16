@@ -7,8 +7,8 @@ android {
         applicationId 'com.gakiji.aiaccount'
         minSdk 36
         targetSdk 36
-        versionCode 34
-        versionName '0.2.18'
+        versionCode 35
+        versionName '0.2.19'
     }
     testOptions.unitTests {
         includeAndroidResources = true

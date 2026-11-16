@@ -20,7 +20,12 @@ final class Ledger extends SQLiteOpenHelper {
         return instance;
     }
 
-    private Ledger(Context context) { super(context, "ledger.db", null, 3); }
+    private final Context context;
+
+    private Ledger(Context context) {
+        super(context, "ledger.db", null, 4);
+        this.context = context;
+    }
 
     @Override public void onConfigure(SQLiteDatabase db) { db.setForeignKeyConstraintsEnabled(true); }
 
@@ -45,6 +50,28 @@ final class Ledger extends SQLiteOpenHelper {
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) db.execSQL("ALTER TABLE entries ADD COLUMN refund_of TEXT");
         if (oldVersion < 3) backfillAccounts(db);
+        if (oldVersion < 4) postCompleteDrafts(db);
+    }
+
+    /** 支付宝账单详情不再要求交易单号，升级时把当前设置下本来会直接入账的草稿入账。 */
+    private void postCompleteDrafts(SQLiteDatabase db) {
+        boolean history = Cloud.prefs(context).getBoolean("history", false);
+        var now = java.time.Instant.now();
+        var zone = java.time.ZoneId.systemDefault();
+        var posting = new ArrayList<Long>();
+        try (Cursor rows = db.query("entries",
+                new String[]{"id", "cents", "direction", "merchant", "payment", "trade_time"},
+                "state=0 AND source=? AND trade_time<>'' AND payment<>''",
+                new String[]{Bill.ALIPAY}, null, null, null)) {
+            while (rows.moveToNext()) {
+                var bill = new Bill(Bill.ALIPAY, "", rows.getLong(1), rows.getInt(2), rows.getString(3),
+                        rows.getString(4), "", rows.getString(5), false);
+                if (bill.shouldPost(history, now, zone)) posting.add(rows.getLong(0));
+            }
+        }
+        for (long id : posting) {
+            db.execSQL("UPDATE entries SET state=1 WHERE id=? AND state=0", new Object[]{id});
+        }
     }
 
     /** 账户别名匹配放宽后，按新规则给此前未分配的流水补上账户。 */

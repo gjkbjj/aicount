@@ -345,10 +345,35 @@ public class BillTest {
         assertEquals("3985", bill.lastFour());
         assertEquals("2026/11/16 05:33:33", bill.tradeTime());
         assertTrue(bill.order().isEmpty());
-        assertFalse(bill.shouldPost(false, now, zone));
+        // 没有交易单号但时间与付款方式齐备，按时间+金额+商家+付款方式去重后直接入账。
+        assertTrue(bill.shouldPost(false, now, zone));
+        assertFalse(bill.shouldPost(false, now.plusSeconds(360), zone));
         assertEquals("支付方式：余额", Bill.alipayLabel("Payment method: Balance"));
         assertNull(Bill.parse(Bill.ALIPAY, List.of("阿里云", "支出5元", "Payment failed",
                 "Payment time", "2026/11/16 05:33:33")));
+    }
+
+    @Test public void alipayDetailWithoutOrderStillPosts() {
+        var now = java.time.Instant.parse("2026-11-16T04:56:00Z");
+        var zone = java.time.ZoneId.of("Asia/Shanghai");
+        List<String> nodes = List.of("账单详情", "阿里云", "支出10元", "交易成功", "支付时间",
+                "2026-11-16 12:55:18", "付款方式", "网商银行储蓄卡(6627) ", "商品说明",
+                "充值:阿里云服务购买,业务交易号:CFPTEST1234567890", "支付奖励", "立即领取10积分",
+                "收款方全称", "阿里云计算有限公司", "更多", "账单管理", "已解锁日用百货贴纸",
+                "账单分类", "日用百货", "标签", "请选择", "为您推荐", "日用品", "计入收支", "开关",
+                "备注", "添加", "联系商家", "查看往来记录");
+        Bill bill = Bill.parse(Bill.ALIPAY, nodes);
+        assertNotNull(bill);
+        assertEquals(1000, bill.cents());
+        assertEquals(-1, bill.direction());
+        assertEquals("阿里云", bill.merchant());
+        assertEquals("网商银行储蓄卡(6627)", bill.payment());
+        assertEquals("6627", bill.lastFour());
+        assertEquals("2026-11-16 12:55:18", bill.tradeTime());
+        assertTrue(bill.order().isEmpty());
+        assertTrue(bill.shouldPost(false, now, zone));
+        assertFalse(bill.shouldPost(false, now.plusSeconds(360), zone));
+        assertTrue(bill.shouldPost(true, now.plusSeconds(360), zone));
     }
 
     @Test public void chineseSystemKeepsEnglishWordsAsData() {
