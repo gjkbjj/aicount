@@ -51,6 +51,11 @@ public final class BillService extends AccessibilityService {
         refreshInspector();
     }
 
+    /** 悬浮窗被系统回收并补回后，重新对齐调试模式的服务配置。 */
+    void syncOverlay() {
+        if (!inspecting) refreshInspector();
+    }
+
     private void refreshInspector() {
         if (inspector == null) return;
         boolean enabled = inspector.refresh();

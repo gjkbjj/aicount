@@ -24,8 +24,8 @@ final class PageInspector {
     private static final int MAX_NODES = 320;
     private static final int MAX_REPORT = 48_000;
     private final BillService service;
-    private final android.content.Context context;
-    private final WindowManager windows;
+    private android.content.Context context;
+    private WindowManager windows;
     private final java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
     private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
     private java.util.concurrent.Future<?> capture;
@@ -34,9 +34,28 @@ final class PageInspector {
     private int eventWindow = -1;
     private String eventPackage = "";
     private String eventClass = "";
+    private boolean disposed;
+
+    /**
+     * 系统或厂商策略会在切到别的应用后回收悬浮窗，窗口上下文也可能随显示设置失效。
+     * 定时检查并在丢失时补回，用户不必回到本应用重新触发。
+     */
+    private final Runnable watchdog = new Runnable() {
+        @Override public void run() {
+            if (disposed) return;
+            refresh();
+            service.syncOverlay();
+            main.postDelayed(this, 3000);
+        }
+    };
 
     PageInspector(BillService service) {
         this.service = service;
+        rebuild();
+        main.postDelayed(watchdog, 3000);
+    }
+
+    private void rebuild() {
         var display = service.getSystemService(android.hardware.display.DisplayManager.class)
                 .getDisplay(android.view.Display.DEFAULT_DISPLAY);
         context = service.createDisplayContext(display).createWindowContext(TYPE, null);
@@ -44,11 +63,19 @@ final class PageInspector {
     }
 
     boolean refresh() {
+        if (disposed) return false;
         if (!Cloud.prefs(service).getBoolean(ENABLED, false) || !Settings.canDrawOverlays(service)) {
             close();
             return false;
         }
         if (button != null && button.getParent() != null) return true;
+        button = null;
+        if (show()) return true;
+        rebuild();
+        return show();
+    }
+
+    private boolean show() {
         var overlay = new ImageButton(new android.view.ContextThemeWrapper(context, R.style.AppTheme));
         overlay.setImageResource(R.drawable.ic_ledger);
         overlay.setContentDescription("捕获当前页面");
@@ -57,6 +84,16 @@ final class PageInspector {
         overlay.setOnLongClickListener(view -> {
             Cloud.prefs(service).edit().putBoolean(ENABLED, false).apply();
             return true;
+        });
+        overlay.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View view) { }
+
+            @Override public void onViewDetachedFromWindow(View view) {
+                if (button != view) return;
+                button = null;
+                main.removeCallbacks(watchdog);
+                main.postDelayed(watchdog, 500);
+            }
         });
         var params = new WindowManager.LayoutParams(dp(48), dp(48), TYPE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_SECURE,
@@ -83,6 +120,8 @@ final class PageInspector {
     }
 
     void dispose() {
+        disposed = true;
+        main.removeCallbacks(watchdog);
         close();
         worker.shutdownNow();
     }
@@ -97,8 +136,15 @@ final class PageInspector {
             reportDialog = null;
         }
         if (button != null) {
-            if (button.getParent() != null) windows.removeViewImmediate(button);
+            View view = button;
             button = null;
+            if (view.getParent() != null) {
+                try {
+                    windows.removeViewImmediate(view);
+                } catch (IllegalArgumentException alreadyGone) {
+                    // 窗口已被系统移除。
+                }
+            }
         }
         eventWindow = -1;
         eventPackage = "";

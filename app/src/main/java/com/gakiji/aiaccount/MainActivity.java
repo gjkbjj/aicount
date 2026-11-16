@@ -1033,6 +1033,23 @@ public final class MainActivity extends Activity {
             addCategoryRule(form, remember);
         }
 
+        CheckBox learnAccount = new CheckBox(this);
+        if (!refund && !adjustment && !accounts.isEmpty()) {
+            learnAccount.setText("记住该支付方式，下次自动分配到此账户");
+            learnAccount.setEnabled(accountSelection.getSelectedItemPosition() > 0);
+            form.addView(learnAccount);
+            form.addView(text("保存时把「" + (entry.payment().isBlank() ? "当前支付方式" : entry.payment())
+                    + "」加入所选账户的别名。", 12, MUTED, false));
+            accountSelection.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+                @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                    if (position == 0) learnAccount.setChecked(false);
+                    learnAccount.setEnabled(position > 0);
+                }
+
+                @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+            });
+        }
+
         Builder dialog = new Builder(this)
             .setTitle(adjustment ? "平账" : refund ? "退款" : (direction < 0 ? "支出" : "收入"))
             .setView(scroll(form))
@@ -1068,6 +1085,7 @@ public final class MainActivity extends Activity {
                     if (target.state() == Ledger.DRAFT) {
                         Cloud.enrich(this, target.id());
                     }
+                    if (learnAccount.isChecked()) learnAccountAlias(account, method);
 
                     alert.dismiss();
                     render();
@@ -1079,6 +1097,17 @@ public final class MainActivity extends Activity {
             }
         }));
         alert.show();
+    }
+
+    /** 把账单上的支付方式写进账户别名，之后同一付款方式可自动分配。 */
+    private void learnAccountAlias(long account, String payment) {
+        if (account <= 0 || payment.isBlank()) return;
+        for (Account target : store.accounts()) {
+            if (target.id() != account) continue;
+            store.saveAccount(target.id(), target.name(), 0,
+                    target.matchPayment().isBlank() ? payment : target.matchPayment() + "、" + payment);
+            return;
+        }
     }
 
     private void accounts() {
@@ -1188,7 +1217,8 @@ public final class MainActivity extends Activity {
         var opening = account == null ? input(form, "期初余额（元）", "0",
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED | InputType.TYPE_NUMBER_FLAG_DECIMAL, 13) : null;
         var payment = input(form, "支付方式别名（可空）", account == null ? "" : account.matchPayment(), InputType.TYPE_CLASS_TEXT, 320);
-        form.addView(text("可填多个，用顿号或逗号分隔，例如：亲属卡、亲情卡", 14, MUTED, false));
+        form.addView(text("可填多个，用顿号或逗号分隔，例如：亲属卡、亲情卡。银行、储蓄卡、尾号等通用词会被忽略，"
+                + "填「网商」即可匹配网商银行储蓄卡(6627)；两个账户都能匹配时留空。", 14, MUTED, false));
         var dialog = new Builder(this).setTitle(account == null ? "新建账户" : "编辑账户").setView(form)
                 .setNegativeButton("取消", null).setPositiveButton("保存", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {

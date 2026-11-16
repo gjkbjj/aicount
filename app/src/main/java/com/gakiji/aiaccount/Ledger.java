@@ -20,7 +20,7 @@ final class Ledger extends SQLiteOpenHelper {
         return instance;
     }
 
-    private Ledger(Context context) { super(context, "ledger.db", null, 2); }
+    private Ledger(Context context) { super(context, "ledger.db", null, 3); }
 
     @Override public void onConfigure(SQLiteDatabase db) { db.setForeignKeyConstraintsEnabled(true); }
 
@@ -44,6 +44,23 @@ final class Ledger extends SQLiteOpenHelper {
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) db.execSQL("ALTER TABLE entries ADD COLUMN refund_of TEXT");
+        if (oldVersion < 3) backfillAccounts(db);
+    }
+
+    /** 账户别名匹配放宽后，按新规则给此前未分配的流水补上账户。 */
+    private void backfillAccounts(SQLiteDatabase db) {
+        var updates = new ArrayList<long[]>();
+        try (Cursor rows = db.query("entries", new String[]{"id", "payment"},
+                "state IN (0,1) AND account IS NULL AND payment<>''", null, null, null, null)) {
+            while (rows.moveToNext()) {
+                long account = matchingAccount(db, rows.getString(1));
+                if (account != 0) updates.add(new long[]{rows.getLong(0), account});
+            }
+        }
+        for (long[] update : updates) {
+            db.execSQL("UPDATE entries SET account=? WHERE id=? AND account IS NULL",
+                    new Object[]{update[1], update[0]});
+        }
     }
 
     record Entry(long id, String source, String merchant, String payment, String tail,
@@ -114,18 +131,28 @@ final class Ledger extends SQLiteOpenHelper {
     }
 
     private long matchingAccount(SQLiteDatabase db, String payment) {
-        long match = 0;
-        int bestScore = 0;
-        try (Cursor rows = db.query("accounts", new String[]{"id", "match_payment"},
+        var candidates = new ArrayList<Account>();
+        try (Cursor rows = db.query("accounts", new String[]{"id", "name", "opening", "match_payment"},
                 "match_payment<>''", null, null, null, null)) {
             while (rows.moveToNext()) {
-                int score = PaymentAliases.match(rows.getString(1), payment);
-                if (score > bestScore) {
-                    match = rows.getLong(0);
-                    bestScore = score;
-                } else if (score == bestScore && score > 0) {
-                    match = 0;
-                }
+                candidates.add(new Account(rows.getLong(0), rows.getString(1), rows.getLong(2), 0,
+                        rows.getString(3)));
+            }
+        }
+        return bestAccount(candidates, payment);
+    }
+
+    /** 取别名匹配得分最高的账户；最高分被多个账户同时命中时留空，不猜。 */
+    static long bestAccount(List<Account> accounts, String payment) {
+        long match = 0;
+        int bestScore = 0;
+        for (Account account : accounts) {
+            int score = PaymentAliases.match(account.matchPayment(), payment);
+            if (score > bestScore) {
+                match = account.id();
+                bestScore = score;
+            } else if (score == bestScore && score > 0) {
+                match = 0;
             }
         }
         return match;
