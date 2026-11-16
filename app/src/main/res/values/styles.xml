@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">AI 记账</string>
+    <string name="service_name">AI 记账 · 账单识别</string>
+    <string name="service_description">读取你打开的微信或支付宝账单，提取交易字段并写入本地账本。</string>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#4656A7</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">#F7F8FE</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

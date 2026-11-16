@@ -1,0 +1,35 @@
+AI 记账 UI graphics
+
+微信、支付宝标志来源于 Simple Icons（CC0-1.0）。
+https://github.com/simple-icons/simple-icons
+
+银行标志（中国银行、工商银行、建设银行、农业银行、交通银行、招商银行、邮储银行、平安银行、中信银行、浦发银行）来源于 Payment Webfont China（CC0-1.0），已从组合标志裁切图形。
+https://github.com/orzFly/payment-webfont-cn
+
+网商银行标志来源于 SVGLOGO，已转换为 PNG。
+https://svglogo.top/library/pay/Mybank.svg
+
+通用图标来源于 Pictogrammers Material Design Icons，已转换为 Android VectorDrawable。
+https://github.com/Templarian/MaterialDesign-SVG
+
+各品牌标志用于识别付款来源或账户，商标权归各权利人。
+Pictogrammers Free License
+--------------------------
+
+This icon collection is released as free, open source, and GPL friendly by
+the [Pictogrammers](http://pictogrammers.com/) icon group. You may use it
+for commercial projects, open source projects, or anything really.
+
+# Icons: Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+Some of the icons are redistributed under the Apache 2.0 license. All other
+icons are either redistributed under their respective licenses or are
+distributed under the Apache 2.0 license.
+
+# Fonts: Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+All web and desktop fonts are distributed under the Apache 2.0 license. Web
+and desktop fonts contain some icons that are redistributed under the Apache
+2.0 license. All other icons are either redistributed under their respective
+licenses or are distributed under the Apache 2.0 license.
+
+# Code: MIT (https://opensource.org/licenses/MIT)
+The MIT license applies to all non-font and non-icon files.

@@ -1,0 +1,34 @@
+plugins { id 'com.android.application' version '8.13.2' }
+
+android {
+    namespace 'com.gakiji.aiaccount'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.gakiji.aiaccount'
+        minSdk 36
+        targetSdk 36
+        versionCode 33
+        versionName '0.2.17'
+    }
+    testOptions.unitTests {
+        includeAndroidResources = true
+        all {
+            def preview = providers.gradleProperty('uiPreview').orElse('false').get().toBoolean()
+            systemProperty 'aiaccount.uiPreview', preview
+            if (preview) jvmArgs '--add-exports=java.base/jdk.internal.access=ALL-UNNAMED'
+            else exclude '**/LedgerRedesignTest.class'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation "org.json:json:20250517"; testImplementation "org.robolectric:robolectric:4.17" }
+
+android.applicationVariants.all { variant ->
+    variant.outputs.all { output ->
+        output.outputFileName = 'AI记账' + variant.versionName + '.apk'
+    }
+}
